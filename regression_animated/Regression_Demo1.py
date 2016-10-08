@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from IPython import display
 import time
 
-class Regression_Opt_Demo:
+class Regression_Demo1:
     def __init__(self):
         self.x = 0
         self.y = 0
