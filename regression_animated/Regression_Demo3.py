@@ -1,21 +1,34 @@
 # This file pairs with chapter 3 of the textbook "Machine Learning Refined" published by Cambridge University Press, 
 # free for download at www.mlrefined.com
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from IPython import display
-import time
 
-class Regression_Demo1:
-    def __init__(self):
+class Regression_Demo3:
+    def __init__(self,csvname):
         self.x = 0
         self.y = 0
         
-        fig = plt.figure(num=None, figsize=(12, 5), dpi=80, facecolor='w', edgecolor='k')
-        self.ax1 = fig.add_subplot(121)
-        self.ax2 = fig.add_subplot(122,projection='3d')
+        self.ln = []
+        self.pt = []
+        self.interactive_pt = []
+        self.k = 0
+
+        fig = plt.figure(num=None, figsize=(10, 5), dpi=80, facecolor='w', edgecolor='k')
+        self.ax1 = fig.add_subplot(131)
+        self.ax2 = fig.add_subplot(132,projection='3d')
+        self.ax3 = fig.add_subplot(133)
+
+        self.load_data(csvname)
+        self.plot_pts()
+        self.make_cost_surface()
+          
+        self.ax_to_plot = self.ax3
+        self.cid = fig.canvas.mpl_connect('button_press_event', self)
         
     # load in a two-dimensional dataset from csv - input should be in first column, oiutput in second column, no headers 
     def load_data(self,csvname):
@@ -42,7 +55,7 @@ class Regression_Demo1:
     # create cost surface
     def make_cost_surface(self):
         # make grid over which surface will be plotted
-        r = np.linspace(-3,3,100)    
+        r = np.linspace(-2,2,100) 
         s,t = np.meshgrid(r,r)
         s = np.reshape(s,(np.size(s),1))
         t = np.reshape(t,(np.size(t),1))
@@ -61,16 +74,24 @@ class Regression_Demo1:
         self.ax2.plot_surface(s,t,g*0,alpha = 0.1)
 
         # make plot look nice
-        self.ax2.view_init(40,20)        
+        self.ax2.view_init(10,20)        
         self.ax2.set_xticks([])
         self.ax2.set_yticks([])
         self.ax2.set_zticks([])
-
         self.ax2.set_xlabel('intercept ',fontsize = 14,labelpad = -5)
         self.ax2.set_ylabel('slope  ',fontsize = 14,labelpad = -5)
-        
         self.ax2.zaxis.set_rotate_label(False)  # disable automatic rotation
         self.ax2.set_zlabel('cost  ',fontsize = 14, rotation = 0,labelpad = 1)
+        
+        levels = np.linspace(0,len(self.x),20)
+        self.ax3.contour(s,t,g,levels,linewidths = 2)
+        self.ax3.set_xticks([])
+        self.ax3.set_yticks([])
+        self.ax3.set_xlim([-2,2])
+        self.ax3.set_ylim([-2,2])
+
+        self.ax3.set_xlabel('intercept ',fontsize = 14,labelpad = 5)
+        self.ax3.set_ylabel('slope  ',fontsize = 14,labelpad = 5)
         
    
     #### computation functions ####    
@@ -79,69 +100,34 @@ class Regression_Demo1:
         for p in range(0,len(self.y)):
             cost +=(b + w*self.x[p] - self.y[p])**2
         return cost
+
+    def __call__(self, event):
+        if not event.inaxes:
+            return
+        # remove current fit line from plot
+        if self.k > 0:
+            for part in self.ln:
+                part.remove()
+            self.pt.remove()
+            self.interactive_pt.remove()
+        self.k += 1
+        
+        # plot click
+        b = event.ydata
+        w = event.xdata
+        
+        self.interactive_pt = self.ax_to_plot.scatter(w,b)
                 
-    # gradient descent function
-    def run_grad_descent(self,max_its,inits,alpha):    
-        # plot points and cost function 
-        fig = plt.figure(num=None, figsize=(12, 5), dpi=80, facecolor='w', edgecolor='k')
-        self.ax1 = fig.add_subplot(121)
-        self.ax2 = fig.add_subplot(122,projection='3d')
-        self.plot_pts()
-        self.make_cost_surface()
-        
-        # initialize parameters - we choose this special to illustrate whats going on
-        b = inits[0]    # initial intercept
-        w = inits[1]      # initial slope
-        P = len(self.y)
-        
         # plot first parameters on cost surface
-        cost = self.compute_cost(b,w)
-        self.ax2.scatter(b,w,cost,color = 'r',marker = 'x',linewidth = 3, alpha = 0.8)
-        
-        # gradient descent loop
-        for k in range(1,max_its+1):   
-
-            # compute each partial derivative - gprime_b is partial with respect to b, gprime_w the partial with respect to w            
-            gprime_b = 0
-            gprime_w = 0
-            for p in range(0,P):
-                temp = 2*(b + w*self.x[p] - self.y[p])
-                gprime_b += temp
-                gprime_w += temp*self.x[p]
-            
-            # take descent step in each partial derivative
-            b = b - alpha*gprime_b
-            w = w - alpha*gprime_w
-
-            ### visualize descent step ###
-
-            # compute cost function value 
-            cost = self.compute_cost(b,w)
-            
-            # plot the line generated by most recent params
-            s = np.linspace(np.min(self.x)-1, np.max(self.x)+10, 100)
-            t = b + s*w
-            ln = self.ax1.plot(s,t,'-r',linewidth = 3) 
-            
-            # plot point on cost surface g(b,w)
-            self.ax2.scatter(b,w,cost,color = 'r',marker = 'x',linewidth = 3, alpha = 0.8)
-           
-            # pause very briefly for visualization
-            time.sleep(0.1)
-
-            # clear panels
-            display.clear_output(wait=True)
-            display.display(plt.gcf()) 
-            
-            # remove current fit line from plot
-            for pt in ln:
-                pt.remove()
-        
-        # prevent two plots from being created (for some reason this happens)
-        display.clear_output(wait=True)
-        print b,w
-
-        # redraw final fit
+        cost = self.compute_cost(w,b)
+        self.pt = self.ax2.scatter(w,b,cost,color = 'r',marker = 'x',linewidth = 3, alpha = 0.8)
+                    
+        # plot the line generated by most recent params
         s = np.linspace(np.min(self.x)-1, np.max(self.x)+10, 100)
-        t = b + s*w
-        ln = self.ax1.plot(s,t,'-r',linewidth = 3)
+        t = w + s*b
+        self.ln = self.ax1.plot(s,t,'-r',linewidth = 3) 
+                       
+        # clear panels
+        display.clear_output(wait=True)
+        display.display(plt.gcf()) 
+        
